@@ -2,6 +2,8 @@
 
 > 本文基于选型调研 [docs/research/2026-07-20-local-first-agent-platform-oss-stack.md](../research/2026-07-20-local-first-agent-platform-oss-stack.md) 与需求 [requirements.md](../../requirements.md)。
 > 无既有代码仓库，本方案为**全新设计（greenfield）**，不涉及现有代码对齐。
+>
+> **⚠ 2026-07-20 客户端 Pivot**：客户端方案已从「OpenClaw 薄封装 OpenHands/Aider」调整为「**VS Code 智能体模式 + Hooks**」，详见补丁文档 [2026-07-20-agentmesh-vscode-pivot.md](./2026-07-20-agentmesh-vscode-pivot.md)。本文正文按补丁增量更新，历史决策以补丁文档为准。
 
 ## 1. 背景与目标
 
@@ -13,10 +15,10 @@ MVP 目标：**用最小开发量跑通"本地执行 → 云端资产 → 技能
 
 | 决策项 | 选择 | 影响 |
 |---|---|---|
-| 技术栈 | **Python + FastAPI**（中台/胶水），React（后台前端） | 与 OpenHands/Aider/Letta/LiteLLM 同生态，可直接 import，胶水最少 |
+| 技术栈 | **Python + FastAPI**（中台/胶水），React（后台前端） | 中台仍用 Python，客户端零开发；LiteLLM SDK 直连 |
 | 自进化程度（FR5） | **半自动**：生成候选 → 审核 → 发版 | Hermes 只产候选，Control Plane 提供审核工作流 |
 | MVP 定位 | **团队自用** | 不做多租户/组织隔离/品牌抽象，架构最简 |
-| 客户端形态 | **薄封装**：复用 OpenHands + Aider | OpenClaw 只做加载/绑定/埋点/记忆接线，不自建执行器 |
+| 客户端形态 | **VS Code 智能体模式 + Hooks**（Pivot 后） | 官方内置 Agents/Skills/Instructions/Hooks/MCP/Plugins；agentmesh 只发资产 + 拉指标，客户端零装机 |
 
 ## 2. 需求范围
 
@@ -56,18 +58,22 @@ MVP 目标：**用最小开发量跑通"本地执行 → 云端资产 → 技能
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  OpenClaw · 本地客户端（开发者本机 / 团队服务器）                        │
-│  ┌──────────────┐  ┌──────────────┐   〔openclaw-agent〕薄封装 Python   │
-│  │  OpenHands   │  │    Aider     │   - 启动时向中台取 variant→拉资产    │
-│  │ (自主/沙箱)   │  │ (交互结对)    │   - 加载 KitOps ModelKit 到执行器   │
-│  └──────┬───────┘  └──────┬───────┘   - 埋点回灌 Langfuse               │
-│         └───────────────────┘          - Letta 记忆接线                  │
-│              │ 走中台 LiteLLM Proxy     - 本地 skill 沉淀（默认不上传）     │
-│              ▼                                                          │
+│  VS Code 智能体模式 · 本地客户端（开发者本机）                            │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │  Agents │ Skills │ Instructions │ Hooks │ MCP │ Plugins        │  │
+│  │  (.agent.md)(SKILL.md)(.instructions.md)(hooks.json)(mcp cfg)  │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│      ↑ VS Code 热加载                        〔agentmesh-hooks〕 Python │
+│      │ pull 落盘 .github/                    - SessionStart: 拉 variant │
+│      │                                        + kit unpack 到 .github/  │
+│      │                                      - UserPromptSubmit: 审计    │
+│      │                                      - PreToolUse: 策略拦截      │
+│      │                                      - Stop: transcript 打包     │
+│      │                                        + trace/session 回灌      │
+│      │                                                                  │
+│      │  (推理路径: VS Code LM Provider → 可选走中台 LiteLLM Proxy)      │
+│      ▼                                                                  │
 │   〔中台 LiteLLM Proxy〕统一路由 Claude/OpenAI/Kimi，集中管密钥+成本+限流  │
-│         ┌────┴────┐                                                    │
-│         │  Letta  │ 本地 agent 记忆/自改进（状态本地）                    │
-│         └─────────┘                                                    │
 └───────┬───────────────────────────────────┬────────────────┬─────────┘
         │ pull 资产(OCI)                      │ 取 flag        │ trace
         ▼                                     ▼                ▼
@@ -90,26 +96,24 @@ MVP 目标：**用最小开发量跑通"本地执行 → 云端资产 → 技能
 
 | 层 | 组件 | 许可证 | 职责 | 边界（不做什么） |
 |---|---|---|---|---|
-| L1 执行 | **OpenHands** | MIT | 自主任务、Docker 沙箱、headless | 不管资产版本/遥测，由 openclaw-agent 注入 |
-| L1 执行 | **Aider** | Apache-2.0 | 交互式结对编程 | 非自主，不碰沙箱 |
-| L1 模型 | **LiteLLM Proxy** | MIT | 中台自托管，统一路由 Claude/OpenAI/Kimi 等云端厂商；集中管密钥+成本+限流+审计 | 跨层唯一模型缝，不做业务；密钥不下发客户端 |
-| L2 资产 | **KitOps** | Apache-2.0 | OCI ModelKit 打包 prompt/skill/tool，SHA-256 不可变 | 不做灰度、不做发现 |
-| L2 工具 | **MCP Registry** | MIT→Apache | MCP server/tool 目录（自托管 Go+PG） | preview 版；只管工具发现 |
-| L2 工具 | MCPJungle（可选） | MPL-2.0 | MCP 网关，统一 tools/prompts 端点 | 访问控制需企业版 |
+| L1 执行 | **VS Code 智能体模式** | 官方 | Agents / Skills / Instructions / MCP 加载 + 执行；审批与工具沙箱由 VS Code 官方处理 | agentmesh 不改客户端；只通过 hooks + 官方文件格式介入 |
+| L1 埋点 | 〔**agentmesh-hooks**〕 | 自写 | 两个 Python 脚本承接 `SessionStart` + `Stop`（可扩展 UserPromptSubmit/PreToolUse） | 只做拉资产/回灌，不做模型路由 |
+| L1 模型 | **LiteLLM Proxy** | MIT | 中台自托管，统一路由 Claude/OpenAI/Kimi 等云端厂商；集中管密钥+成本+限流+审计 | 跨层唯一模型缝；能否强制 VS Code 走 Proxy 见 §8 未决项 |
+| L2 资产 | **KitOps** | Apache-2.0 | OCI ModelKit 打包 VS Code 官方格式文件（.agent.md / SKILL.md / .instructions.md / hooks.json / mcp cfg），SHA-256 不可变 | 不做灰度、不做发现 |
+| L2 工具 | **MCP Registry**（可选） | MIT→Apache | MCP server/tool 目录（自托管 Go+PG） | preview 版；只管工具发现 |
 | L2 应用 | Dify DSL（可选） | — | workflow 应用级 YAML 打包 | 与 KitOps 互补，非必需 |
 | L3 灰度 | **GrowthBook** | MIT | 多值 flag + client_id 粘性分桶 → 返回版本串 | 不管资产内容，只返版本号 |
 | L4 遥测 | **Langfuse** | MIT | trace/评估/prompt 管理，可气隙 | 数据自托管不出网 |
-| L5 记忆 | **Letta** | Apache-2.0 | agent 记忆/自改进，本地状态 | local 指状态本地，推理仍走 LiteLLM |
-| 中台 | 〔**agentmesh-api**〕 | 自写 | 资产/实验编排、审核、发版、后台 | FastAPI，见 §4.4 |
-| 客户端 | 〔**openclaw-agent**〕 | 自写 | 加载/绑定/埋点/记忆接线 | 薄封装，见 §4.4 |
-| 自进化 | 〔**hermes-worker**〕 | 自写 | Letta 轨迹→skill 候选 | 只产候选，不自动生效 |
+| L5 记忆 | **VS Code Memory 面板** + Letta（可选） | 官方 / Apache-2.0 | VS Code 内置 Memory 承担会话记忆；Letta 降级为可选深度记忆组件 | agentmesh 只通过 hooks 上传关键片段回中台 |
+| 中台 | 〔**agentmesh-api**〕 | 自写 | 资产/实验编排、审核、发版、后台 + hooks resolve/ingest | FastAPI，见 §4.4 |
+| 自进化 | 〔**hermes-worker**〕 | 自写 | Langfuse trace + 会话 ingest → skill 候选 | 只产候选，不自动生效 |
 
 **架构决策取舍：**
 
-- **薄封装 vs 自建执行器**：选薄封装。OpenHands 已内置 Docker 沙箱 + LiteLLM 多模型 + headless，自建等于重造轮子且违背"最小胶水"。代价是客户端需容器运行时（macOS/Linux/WSL 均可）。
-- **KitOps(OCI) vs 自建 zip+manifest**：选 KitOps。需求 FR2 要"版本化包 + manifest"，KitOps 的 OCI ModelKit + SHA-256 不可变摘要天然满足版本基线，且能复用任意现成 registry（Harbor/Zot/GHCR），零额外存储服务。自建 zip 要自己解决版本不可变、去重、选择性拉取，改动面更大。
+- **VS Code 智能体模式 vs 自建 OpenClaw 薄封装**：选 VS Code。官方已内置 Agents/Skills/Instructions/Hooks/MCP/Plugins 六类自定义位，覆盖客户端全部胶水；agentmesh 收缩到"发资产 + 拉指标 + 审核候选"回路，客户端零装机、零维护。原 OpenHands + Aider + Letta 三方 SDK 接线全部删除。见 [vscode-pivot 补丁](./2026-07-20-agentmesh-vscode-pivot.md)。
+- **KitOps(OCI) vs 自建 zip+manifest**：选 KitOps。需求 FR2 要"版本化包 + manifest"，KitOps 的 OCI ModelKit + SHA-256 不可变摘要天然满足版本基线，且能复用任意现成 registry（Harbor/Zot/GHCR），零额外存储服务。ModelKit 里塞的就是 VS Code 官方文件格式（`.agent.md` / `SKILL.md` / `.instructions.md` / `hooks.json` / mcp cfg），pull 后直接落盘 `.github/` 生效。
 - **GrowthBook 返回"版本串"而非布尔**：这是 L3↔L2 接线的核心，见 §4.5。
-- **Python 单语言**：中台、客户端、Hermes 全 Python，可直接 import OpenHands/Letta SDK，避免跨语言 HTTP 胶水（若用 Go/TS 中台，调 agent 要走进程边界）。
+- **Python + FastAPI 中台**：中台、Hermes、hooks 脚本全 Python，LiteLLM SDK 直连；无跨语言 HTTP 胶水。
 
 ### 4.2 核心数据流
 
@@ -117,23 +121,30 @@ MVP 目标：**用最小开发量跑通"本地执行 → 云端资产 → 技能
 
 ```
 ① 会话启动（灰度绑定 + 资产加载）
-   openclaw-agent ──client_id──► GrowthBook SDK ──► variant 版本串 "coding@1.5.0-canary"
-                  ──版本串──► agentmesh-api /assets/resolve ──► KitOps ref
-                  ──kit unpack <ref>──► ClawHub OCI Registry ──► 本地缓存 ModelKit
-                  ──加载 prompt/skill/tool──► OpenHands / Aider
+   VS Code SessionStart hook ──client_id──► agentmesh-api /api/hooks/resolve
+                            ↓
+                    GrowthBook SDK ──► variant 版本串 "coding@1.5.0-canary"
+                            ↓
+                    返 [{asset_id, version, kit_ref}]
+                            ↓
+   session_start.py ──kit unpack <kit_ref>──► ClawHub OCI Registry
+                    ──落盘到 .github/──► VS Code 热加载 Agents/Skills/Instructions/MCP
    (命中本地缓存则跳过拉取；无缓存回退 baseline 版本)
 
-② 执行（云端多厂商推理）
-   OpenHands/Aider ──► 中台 LiteLLM Proxy ──► Claude / OpenAI / Kimi 等厂商
-                   （推理内容按厂商 API 出境；密钥由 Proxy 集中托管，客户端只持内部 token）
-                   ──trace(含 variant 标签)──► Langfuse（自托管，遥测数据不进第三方 SaaS）
+② 执行（VS Code 智能体模式，云端多厂商推理）
+   VS Code Agent ──► LM Provider ──► Claude / OpenAI / Kimi 等厂商
+                 （可选：M0 spike 验证能否强制走中台 LiteLLM Proxy 集中管密钥）
+                 ──PostToolUse hook──► 记文件变更 / 命令审计
+                 ──trace(含 variant 标签)──► Langfuse（自托管）
 
 ③ 技能沉淀（本地）
-   会话结束 ──提取可复用 skill──► 本地 skill 文件 + Letta 记忆   （默认不上传，FR4）
+   Stop hook ──读 transcript_path──► 提取可复用 skill 候选
+             ──默认仅 metadata──► POST /api/sessions/ingest
+   （原始对话默认留本机；显式开启 uploadTranscript 才上传，FR4/FR6）
 
 ④ 自进化（半自动）
-   hermes-worker ──读 Letta 轨迹+反馈+沉淀 skill──► 生成 skill 改进候选
-                 ──POST /skills/candidates──► agentmesh-api（状态=pending）
+   hermes-worker ──读 Langfuse 轨迹 + /api/sessions 记录 + 反馈──► 生成 skill 改进候选
+                 ──POST /api/skills/candidates──► agentmesh-api（状态=pending）
 
 ⑤ 审核发版（FR7）
    运营 ──React 后台──► 审核候选 ──approve──► agentmesh-api
@@ -141,7 +152,7 @@ MVP 目标：**用最小开发量跑通"本地执行 → 云端资产 → 技能
    （新版本进入 ① 的灰度池，闭环成立）
 
 ⑥ 回流共享（显式授权，FR6）
-   用户 ──显式授权──► openclaw-agent 去标识化 skill ──► ClawHub 共享区
+   用户 ──VS Code 设置 uploadTranscript=true──► Stop hook 去标识化 skill 上传
    （默认关闭；上传内容不含原始对话）
 ```
 
@@ -212,10 +223,16 @@ CREATE TABLE `skill_candidate` (
 **资产与版本解析（供客户端）**
 | 路径 | 方法 | 功能 |
 |---|---|---|
-| `/api/assets/resolve` | POST | 入参 `{clientId, assetId}` → 查 GrowthBook variant → 返 `{version, kitRef}`（客户端据此 pull） |
+| `/api/assets/resolve` | POST | 入参 `{clientId, assetId}` → 查 GrowthBook variant → 返 `{version, kitRef}`（供 CLI/后台单资产调用；hook 场景推荐用批量 `/api/hooks/resolve`） |
 | `/api/assets` | GET | 列表：资产 + 各版本/通道（分页、按 assetId 筛选） |
 | `/api/assets/{assetId}/versions` | GET | 某资产全部版本 |
 | `/api/assets/{assetId}/baseline` | PATCH | 入参 `{version}`：将胜出 variant 提为新 baseline（移动 floating tag 指针，见 §4.8），旧 baseline 降为 latest。供遥测页"提为 baseline"调用（PRD-09） |
+
+**VS Code Hooks 专用接口（Pivot 后新增，见 [vscode-pivot 补丁](./2026-07-20-agentmesh-vscode-pivot.md) §7）**
+| 路径 | 方法 | 触发方 | 功能 |
+|---|---|---|---|
+| `/api/hooks/resolve` | POST | `SessionStart` hook | 入参 `{clientId, workspaceRoot, assetIds?}` → 批量查 GrowthBook → 返 `{assignments:[{assetId, version, kitRef}]}`；hook 据此 `kit unpack` 到 `.github/` |
+| `/api/sessions/ingest` | POST | `Stop` hook | 入参 `{sessionId, clientId, variantBindings, transcriptRef?, toolCallsSummary, feedback?}` → 中台存会话 metadata + 转 Langfuse trace；`transcriptRef` 默认不含原文，走显式授权才上传 |
 
 **实验管理（FR3，后台 CRUD）**
 | 路径 | 方法 | 功能 |
@@ -252,20 +269,20 @@ CREATE TABLE `skill_candidate` (
 **桥接（4 步，GrowthBook 原语足够）：**
 1. **多值 flag 承载版本串**：GrowthBook experiment 的每个 variant 值 = 资产版本串（如 `coding-agent@1.5.0-canary`），非布尔。
 2. **一致性哈希粘性分桶**：GrowthBook 按 `client_id` 做百分比 rollout 且稳定分桶，天然满足 FR3"同 client 多次请求绑定同 variant"，**不用自写哈希**。
-3. **客户端胶水（要写）**：`openclaw-agent` 启动/定时 → 传 client_id 取版本串 → `/api/assets/resolve` 换 KitOps ref → `kit unpack <ref>@<version>` → 加载进 OpenHands/Aider。失败回退 baseline。
-4. **实验回灌 Langfuse**：把 variant 值作为 trace 维度标签，成功率/时延/反馈按 variant 聚合，实验结论直接在 Langfuse 看，无需自建统计后端。
+3. **客户端胶水（要写）**：VS Code `SessionStart` hook → 传 client_id + workspaceRoot 调 `/api/hooks/resolve` → 拿到 `{assetId, version, kitRef}` 数组 → `kit unpack <kitRef>` → 落盘到 `.github/agents/`、`.github/skills/`、`.github/instructions/`、`.mcp/config.json` → VS Code 热加载。失败回退 baseline。
+4. **实验回灌 Langfuse**：`Stop` hook 把 variant 值作为 trace 维度标签打回，成功率/时延/反馈按 variant 聚合，实验结论直接在 Langfuse 看，无需自建统计后端。
 
 ### 4.6 要自己写的最小胶水模块清单
 
 | 模块 | 语言 | 职责 | 规模 |
 |---|---|---|---|
-| `openclaw-agent` | Python | 取 flag→拉版本→加载→失败回退状态机；trace 埋点；Letta 记忆接线；本地 skill 沉淀 | 中，客户端核心 |
+| `agentmesh-hooks` | Python | 两个脚本：`session_start.py` 调 resolve + kit unpack 落盘；`stop.py` 读 transcript + POST ingest。纯 stdin/stdout + HTTP，无 SDK 依赖 | 小，客户端唯一胶水 |
 | `agentmesh-api` | Python/FastAPI | §4.4 全部接口 + SQLite 状态 + 调 GrowthBook/KitOps/Langfuse SDK | 中，中台核心 |
-| `hermes-worker` | Python | 读 Letta 轨迹+反馈 → LLM 生成 skill 候选 → 提交待审 | 小-中，定时 job |
+| `hermes-worker` | Python | 读 Langfuse trace + `/api/sessions` 记录 + 反馈 → LLM 生成 skill 候选 → 提交待审 | 小-中，定时 job |
 | React 运营后台 | TS/React | 资产/实验/候选审核/遥测 4 个页面 | 中 |
 | 版本命名约定 | 约定 | `<asset_id>@<semver>[-channel]` ↔ KitOps ref 解析规则 | 小，一处约定 |
 
-> 除此之外全部复用开源件。胶水集中在两条缝：**L3→L2（flag→版本→pull）** 与 **L2→L1（ModelKit→执行器加载）**。
+> 除此之外全部复用开源件（VS Code 自身承担 L1 执行）。胶水集中在两条缝：**L3→L2（flag→版本→pull）** 与 **L2→VS Code（ModelKit→`.github/` 落盘热加载）**。
 
 ### 4.7 状态流转
 
@@ -326,14 +343,14 @@ CREATE TABLE `skill_candidate` (
 ├── MCP Registry (可选, Go+PG)                   ← L2 工具（后续）
 └── hermes-worker (定时 job)                     ← 自进化
 
-开发者本机 / 终端（macOS/Linux/WSL）
-├── openclaw-agent (Python 薄封装)
-├── OpenHands (需 Docker 运行时) + Aider
-├── Letta (本地记忆状态)
-└── 走中台 LiteLLM Proxy（不在本机存密钥）
+开发者本机（macOS/Linux/WSL）
+├── VS Code + 智能体模式                        ← 执行器（零装机、无需 Docker）
+├── .github/hooks/agentmesh.json                ← 工作区级 hook 注册
+├── agentmesh-hooks scripts (Python)            ← 两个脚本，随仓库分发
+└── kit CLI                                     ← KitOps 客户端，用于 unpack ModelKit
 ```
 
-- 平台自身服务全套私有化，核心服务不依赖第三方 SaaS（NFR2）✅。GrowthBook、Langfuse 均可自托管。**推理经中台 LiteLLM Proxy 出境到云端厂商**。
+- 平台自身服务全套私有化，核心服务不依赖第三方 SaaS（NFR2）✅。GrowthBook、Langfuse 均可自托管。**推理经 VS Code LM Provider 出境**（能否强制走中台 LiteLLM Proxy 见 §8 未决项）。
 
 ### 6.2 安全与数据隐私边界（NFR1 修正版）
 
@@ -345,15 +362,15 @@ CREATE TABLE `skill_candidate` (
 | skill 沉淀 | 本机 | **默认否** | FR4 默认本地；FR6 显式授权才去标识化上传 |
 | 资产（prompt/skill/tool） | ClawHub | 内网 | 团队共享资产，非用户私密数据 |
 
-- **回流去标识化**：FR6 上传前剥离原始对话，只留 skill 文本。上传默认关闭，需显式授权。
-- **安全提醒（架构级）**：agentmesh-api、GrowthBook、Langfuse 等**内网服务默认无强认证**——团队自用可先用内网隔离 + 反向代理加 Basic Auth/SSO，但这属于**必须在部署阶段补齐的访问控制**，不能裸暴露。OpenHands 的 Docker 沙箱是 agent 自主执行命令的安全边界，**不可关闭**。
+- **回流去标识化**：FR6 上传前剥离原始对话，只留 skill 文本。上传默认关闭，需显式授权（VS Code 设置 `agentmesh.uploadTranscript=true`）。
+- **安全提醒（架构级）**：agentmesh-api、GrowthBook、Langfuse 等**内网服务默认无强认证**——团队自用可先用内网隔离 + 反向代理加 Basic Auth/SSO，但这属于**必须在部署阶段补齐的访问控制**，不能裸暴露。VS Code 智能体侧的工具审批与 `PreToolUse` hook 承担了原 OpenHands Docker 沙箱的安全职责，**不可禁用官方审批**。
 
 ## 7. 里程碑规划
 
 | 里程碑 | 内容 | 验证目标 |
 |---|---|---|
-| **M0 环境就绪** | docker-compose 起 GrowthBook + OCI Registry + LiteLLM Proxy（Langfuse 复用现有实例）；本机 OpenHands 经 Proxy 调通云端厂商 | 各开源件自托管可用、云端推理通 |
-| **M1 MVP 竖切（核心）** | GrowthBook + KitOps + Langfuse 一条竖切：openclaw-agent 取 variant→pull ModelKit→加载→trace 回灌 | **一次性验证 FR2+FR3+FR7 闭环成立**（最高优先级） |
+| **M0 环境就绪** | docker-compose 起 GrowthBook + OCI Registry + LiteLLM Proxy（Langfuse 复用现有实例）；本机 VS Code 智能体模式可用 + spike 验证能否走 Proxy | 各开源件自托管可用、VS Code 智能体推理通 |
+| **M1 MVP 竖切（核心）** | GrowthBook + KitOps + Langfuse 一条竖切：VS Code `SessionStart` hook 取 variant→pull ModelKit→落盘 `.github/`→热加载→`Stop` hook 回灌 trace | **一次性验证 FR2+FR3+FR7 闭环成立**（最高优先级） |
 | **M2 资产与后台** | agentmesh-api 资产/实验 CRUD + React 后台；版本命名约定落地 | 运营可建实验、管资产、看 variant 指标 |
 | **M3 沉淀与自进化** | Letta 记忆接线 + 本地 skill 沉淀 + hermes-worker 产候选 + 审核发版 | FR4+FR5 半自动闭环，候选可审可发 |
 | **M4 回流与增强** | FR6 去标识化回流；MCP Registry 工具分发；弱网离线缓存打磨 | 共享回流 + L2 工具层增强 |
@@ -363,5 +380,6 @@ CREATE TABLE `skill_candidate` (
 ## 8. 未决项（待后续澄清）
 
 - ~~**版本命名约定细节**~~：**已定稿，见 §4.8**（channel 编进 tag 的 floating tag 指针方案）。✅
-- **OpenHands 加载外部 ModelKit 的官方机制**：是否有支持的加载点，还是需在 openclaw-agent 内做文件注入（调研判断需自定义胶水，**M1 第一刀需实测确认**——这是当前唯一阻塞 M1 落地的技术未知）。
+- ~~**OpenHands 加载外部 ModelKit 的官方机制**~~：**已消解**——客户端 pivot 到 VS Code 智能体模式后，加载点就是 `.github/agents/`、`.github/skills/`、`.github/instructions/`、`.mcp/config.json`，VS Code 官方热加载，无须自建加载点。见 [vscode-pivot 补丁](./2026-07-20-agentmesh-vscode-pivot.md) §6。✅
+- **VS Code 智能体 LM base URL 覆盖机制（M0 前置 spike）**：能否强制走中台 LiteLLM Proxy 集中托管密钥+审计。若不支持，Proxy 降级为"只做审计与限流的旁路"，密钥托管由 VS Code Copilot Enterprise 或用户自配 provider 承担。
 - **实验样本量与统计功效**：团队级低流量下实验周期评估，属运营策略，非架构项。已在遥测页做样本量进度提示（PRD-10）管理预期。

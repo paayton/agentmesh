@@ -19,14 +19,14 @@
 
 ## 2. 触点明细（每个角色看什么页面、做什么操作）
 
-### ① 终端使用者 —— OpenClaw 客户端
+### ① 终端使用者 —— VS Code 智能体模式（Pivot 后）
 
 | 环节 | 触点 | 看到什么 | 可做操作 | 关联需求 |
 |---|---|---|---|---|
-| ① 会话启动 | 客户端启动态 | 当前绑定的 variant/版本、来源（灰度/回退 baseline）、缓存状态 | 强制拉最新 / 锁定版本 | PRD-01 |
-| ② 本地执行 | 执行界面（OpenHands/Aider） | 任务进度、agent 动作 | 正常交互；执行后 👍/👎 反馈 | PRD-07 |
-| ③ 技能沉淀 | 本地 skill 面板 | 已沉淀 skill 清单、来源会话 | 手动标记"值得沉淀"、删除 | PRD-11 |
-| ⑥ 回流共享 | 回流授权弹窗 | 去标识化后的 skill 内容预览 | 显式授权上传 / 拒绝（默认关闭） | PRD-13 |
+| ① 会话启动 | VS Code Agents 面板 + hook 状态栏 | 当前会话绑定的 variant/版本（`.github/agents/*.agent.md` frontmatter 里 `agentmesh.variant`），来源（灰度/回退 baseline） | 强制拉最新 / 锁定版本（走 `Chat: Configure Hooks` 或 CLI） | PRD-01 |
+| ② 本地执行 | VS Code Chat 视图 | 任务进度、agent 动作、工具审批弹窗 | 正常交互；执行后 👍/👎 反馈（走 hook 或 Chat 反馈接口） | PRD-07 |
+| ③ 技能沉淀 | VS Code Skills 面板（`.github/skills/`） | 已沉淀 skill 清单（SKILL.md 列表）、来源会话 | `Chat: Generate Skill` 或手动新增 SKILL.md；沉淀内容通过 `Stop` hook 打候选 | PRD-11 |
+| ⑥ 回流共享 | VS Code 设置 `agentmesh.uploadTranscript` + 授权弹窗 | 去标识化后的 skill 内容预览 | 开关显式授权；`Stop` hook 剥离原文后上传（默认关闭） | PRD-13 |
 
 ### ② 资产运营者 —— React 运营后台
 

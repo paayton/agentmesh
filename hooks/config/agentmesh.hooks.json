@@ -1,0 +1,31 @@
+{
+  "//": "AgentMesh hooks · VS Code 智能体模式生命周期埋点。安装：拷贝到 .github/hooks/agentmesh.json。",
+  "//_docs": "https://code.visualstudio.com/docs/agent-customization/hooks",
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "python3 ${workspaceFolder}/hooks/scripts/session_start.py",
+        "timeout": 30,
+        "env": {
+          "AGENTMESH_API": "${env:AGENTMESH_API}",
+          "AGENTMESH_CLIENT_ID": "${env:AGENTMESH_CLIENT_ID}",
+          "AGENTMESH_TOKEN": "${env:AGENTMESH_TOKEN}"
+        }
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "python3 ${workspaceFolder}/hooks/scripts/stop.py",
+        "timeout": 30,
+        "env": {
+          "AGENTMESH_API": "${env:AGENTMESH_API}",
+          "AGENTMESH_CLIENT_ID": "${env:AGENTMESH_CLIENT_ID}",
+          "AGENTMESH_TOKEN": "${env:AGENTMESH_TOKEN}",
+          "AGENTMESH_UPLOAD_TRANSCRIPT": "${env:AGENTMESH_UPLOAD_TRANSCRIPT}"
+        }
+      }
+    ]
+  }
+}
