@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentMesh 运营后台</title>
+<style>
+:root{
+  --bg:#0d1117; --surface:#161b22; --surface-2:#1c2128; --overlay:#1c2128;
+  --border:#30363d; --border-mut:#21262d;
+  --t1:#e6edf3; --t2:#7d8590; --t3:#6e7681;
+  --primary:#3b82f6; --primary-h:#4c8ef7; --primary-bg:#132033;
+  --green:#3fb950; --green-bg:#12261a; --yellow:#d29922; --yellow-bg:#251d0e;
+  --red:#f85149; --red-bg:#2a1416; --blue:#3b82f6; --blue-bg:#132033;
+  --gray:#7d8590; --gray-bg:#1c2128;
+  --font:"PingFang SC","Microsoft YaHei",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --mono:"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --maxw:1440px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);font-size:13px;line-height:20px;color:var(--t1);background:var(--bg)}
+svg{display:block}
+.ico{width:16px;height:16px;stroke:currentColor;stroke-width:1.75;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ico-sm{width:14px;height:14px}
+/* topbar */
+.topbar{height:48px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:14px;position:fixed;top:0;left:0;right:0;z-index:100}
+.topbar .logo{font-size:15px;font-weight:600;color:var(--t1);display:flex;align-items:center;gap:8px}
+.topbar .logo b{color:var(--primary)}
+.topbar .logo svg{width:20px;height:20px;stroke:var(--primary);stroke-width:1.75;fill:none}
+.top-search{flex:1;max-width:360px;position:relative;display:flex;align-items:center}
+.top-search svg{position:absolute;left:10px;width:15px;height:15px;stroke:var(--t3);stroke-width:1.75;fill:none;pointer-events:none}
+.top-search input{width:100%;height:32px;padding:0 10px 0 32px;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;color:var(--t1);font-size:13px;outline:none}
+.top-search input:focus{border-color:var(--primary)}
+.spacer{flex:1}
+.env-switch{display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;color:var(--t2);font-size:12px;cursor:pointer}
+.env-switch:hover{color:var(--t1)}
+.env-switch svg{width:14px;height:14px;stroke:currentColor;stroke-width:1.75;fill:none}
+.env-switch .dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+.avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#5e6ad2);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;cursor:pointer}
+/* layout */
+.layout{display:flex;padding-top:48px}
+.sidebar{width:200px;background:var(--surface);border-right:1px solid var(--border);height:calc(100vh - 48px);position:fixed;top:48px;left:0;padding:8px 0}
+.nav-item{display:flex;align-items:center;gap:10px;height:38px;padding:0 20px;color:var(--t2);cursor:pointer;font-size:13px;border-left:2px solid transparent;transition:all .12s}
+.nav-item:hover{background:var(--surface-2);color:var(--t1)}
+.nav-item.active{color:var(--primary);border-left-color:var(--primary);background:var(--primary-bg);font-weight:500}
+.nav-item .ico{width:16px;height:16px}
+.main{margin-left:200px;padding:20px;flex:1;min-height:calc(100vh - 48px)}
+.wrap{max-width:var(--maxw);margin:0 auto}
+.page-title{font-size:16px;font-weight:600;margin-bottom:14px}
+/* stat cards */
+.stats{display:flex;gap:8px;margin-bottom:14px}
+.stat-card{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;position:relative}
+.stat-card .lbl{font-size:12px;color:var(--t2);display:flex;align-items:center;gap:6px}
+.stat-card .lbl svg{width:14px;height:14px;stroke:var(--t3);stroke-width:1.75;fill:none}
+.stat-card .num{font-size:24px;font-weight:600;color:var(--t1);line-height:30px;margin-top:4px}
+.stat-card .num.pri{color:var(--primary)}
+.stat-card .trend{position:absolute;top:12px;right:14px;font-size:12px;font-weight:500;display:flex;align-items:center;gap:2px}
+.trend.up{color:var(--green)} .trend.down{color:var(--red)} .trend.flat{color:var(--t2)}
+.spark{position:absolute;bottom:10px;right:12px;width:64px;height:22px}
+/* panel */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:12px}
+.panel-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border)}
+.panel-head .ptitle{font-size:13px;font-weight:500}
+.panel-head .count{font-size:12px;color:var(--t3)}
+.panel-head .hspacer{flex:1}
+.hint{font-size:12px;color:var(--t2);margin-bottom:12px}
+/* controls */
+input,select{height:30px;border:1px solid var(--border);border-radius:6px;padding:0 10px;font-size:13px;font-family:var(--font);color:var(--t1);background:var(--surface-2);outline:none}
+input:focus,select:focus{border-color:var(--primary)}
+input::placeholder{color:var(--t3)}
+.btn{height:30px;border:none;border-radius:6px;padding:0 14px;font-size:13px;cursor:pointer;font-family:var(--font);transition:background .12s;display:inline-flex;align-items:center;gap:6px}
+.btn svg{width:14px;height:14px;stroke:currentColor;stroke-width:1.75;fill:none}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-h)}
+.btn-default{background:var(--surface-2);color:var(--t1);border:1px solid var(--border)}
+.btn-default:hover{background:var(--surface)}
+.btn-sm{height:26px;padding:0 10px;font-size:12px;border-radius:6px}
+.btn-text{background:none;border:none;color:var(--primary);cursor:pointer;font-size:12px;padding:0 6px}
+.btn-text:hover{color:var(--primary-h)}
+.btn-text.danger{color:var(--red)}
+.btn-text.mut{color:var(--t2)}
+.btn-text.mut:hover{color:var(--t1)}
+/* table */
+table{width:100%;border-collapse:collapse;background:var(--surface)}
+thead th{background:var(--surface);color:var(--t2);font-size:12px;font-weight:400;text-align:left;padding:0 12px;height:36px;border-bottom:1px solid var(--border);white-space:nowrap}
+thead th.sortable{cursor:pointer;user-select:none}
+thead th.sortable:hover{color:var(--t1)}
+thead th .sort-ico{display:inline-block;margin-left:4px;color:var(--t3);font-size:11px}
+thead th.sorted .sort-ico{color:var(--primary)}
+tbody td{padding:0 12px;height:40px;border-top:1px solid var(--border-mut);font-size:13px;color:var(--t1);vertical-align:middle}
+tbody tr.clickable{cursor:pointer}
+tbody tr.clickable:hover{background:var(--surface-2)}
+.mono{font-family:var(--mono);font-size:12px;color:var(--t2)}
+.arrow{color:var(--t3);margin-left:auto}
+/* badge */
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:12px;line-height:18px;padding:0 6px;border-radius:4px}
+.badge::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+.badge.active,.badge.published{background:var(--green-bg);color:var(--green)}
+.badge.paused,.badge.pending{background:var(--yellow-bg);color:var(--yellow)}
+.badge.archived,.badge.rejected{background:var(--gray-bg);color:var(--gray)}
+.badge.pub{background:var(--blue-bg);color:var(--blue)}
+.badge.baseline{background:var(--gray-bg);color:var(--gray)}
+.badge.latest{background:var(--green-bg);color:var(--green)}
+.badge.experiment{background:var(--blue-bg);color:var(--blue)}
+.badge.plain::before{display:none}
+/* empty & skeleton */
+.empty{text-align:center;color:var(--t3);padding:40px 20px;font-size:13px}
+.empty svg{width:32px;height:32px;stroke:var(--t3);stroke-width:1.5;fill:none;margin:0 auto 10px}
+.skeleton td{padding:0 12px;height:40px;border-top:1px solid var(--border-mut)}
+.sk-bar{height:12px;border-radius:4px;background:linear-gradient(90deg,var(--surface-2) 25%,#252b33 50%,var(--surface-2) 75%);background-size:200% 100%;animation:shimmer 1.2s infinite}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+/* drawer */
+.drawer-mask{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;z-index:180}
+.drawer-mask.show{display:block}
+.drawer{position:fixed;top:0;right:0;height:100vh;width:480px;max-width:92vw;background:var(--surface);border-left:1px solid var(--border);z-index:190;transform:translateX(100%);transition:transform .2s ease;display:flex;flex-direction:column}
+.drawer.show{transform:translateX(0)}
+.drawer-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);flex:none}
+.drawer-head h3{font-size:14px;font-weight:600;flex:1}
+.drawer-head .close{cursor:pointer;color:var(--t2);width:20px;height:20px;stroke-width:1.75;fill:none;stroke:currentColor}
+.drawer-head .close:hover{color:var(--t1)}
+.drawer-body{padding:16px;overflow-y:auto;flex:1}
+.drawer-body h4{font-size:12px;color:var(--t2);font-weight:400;margin:16px 0 8px}
+.drawer-body h4:first-child{margin-top:0}
+.kv{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-mut);font-size:13px}
+.kv .k{color:var(--t2)}
+.sub-table{width:100%;border-collapse:collapse;background:none}
+.sub-table th{background:none;height:30px;color:var(--t3);font-size:12px;text-align:left;padding:0 8px;border-bottom:1px solid var(--border-mut)}
+.sub-table td{height:34px;border-top:1px solid var(--border-mut);padding:0 8px;font-size:12px}
+/* diff side-by-side */
+.diff2{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border-mut);border:1px solid var(--border-mut);border-radius:6px;overflow:hidden}
+.diff2 .col{background:#0a0d12}
+.diff2 .col-head{font-size:11px;color:var(--t2);padding:6px 10px;border-bottom:1px solid var(--border-mut);background:var(--surface-2)}
+.diff2 pre{font-family:var(--mono);font-size:12px;line-height:19px;padding:10px;white-space:pre-wrap;color:#c9d1d9;overflow-x:auto}
+.diff2 .del{color:var(--red);display:block}
+.diff2 .add{color:var(--green);display:block}
+/* modal */
+.mask{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:200}
+.mask.show{display:flex}
+.modal{background:var(--overlay);border:1px solid var(--border);border-radius:8px;width:480px;max-width:90vw;max-height:85vh;overflow-y:auto;padding:20px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.modal h3{font-size:15px;font-weight:600;margin-bottom:14px}
+.form-item{margin-bottom:12px}
+.form-item label{display:block;font-size:12px;color:var(--t2);margin-bottom:6px}
+.form-item label .req{color:var(--red)}
+.form-item input,.form-item select,.form-item textarea{width:100%}
+.form-item textarea{border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-family:var(--font);font-size:13px;color:var(--t1);background:var(--surface-2);outline:none;resize:vertical;min-height:72px}
+.form-item textarea:focus{border-color:var(--primary)}
+.variant-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.variant-row input{flex:1}
+.variant-row .w{width:80px;flex:none}
+.alloc-sum{font-size:12px;margin-top:4px}
+.alloc-sum.ok{color:var(--green)} .alloc-sum.bad{color:var(--red)}
+.modal-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.err{color:var(--red);font-size:12px;margin-top:4px;display:none}
+.err.show{display:block}
+/* toast */
+.toast-wrap{position:fixed;top:60px;right:20px;z-index:300;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--surface-2);color:var(--t1);padding:10px 16px;border:1px solid var(--border);border-left:3px solid var(--t2);border-radius:6px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.4);animation:slideIn .2s}
+.toast.ok{border-left-color:var(--green)}
+.toast.warn{border-left-color:var(--yellow)}
+@keyframes slideIn{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
+/* 样本量进度条 */
+.progress{width:88px;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden;display:inline-block;vertical-align:middle;margin-right:6px}
+.progress > i{display:block;height:100%;background:var(--primary);border-radius:3px}
+.progress.full > i{background:var(--green)}
+.prog-txt{font-size:12px;color:var(--t2)}
+/* 胜出徽标 + 提 baseline 按钮 */
+.badge.win{background:var(--green-bg);color:var(--green)}
+.badge.win::before{content:"★";width:auto;height:auto;background:none;margin-right:2px}
+.badge.lead{background:var(--primary-bg);color:var(--primary)}
+.badge.lead::before{display:none}
+/* 反馈条 👍/👎 */
+.fb{display:flex;align-items:center;gap:8px}
+.fb .up{color:var(--green)} .fb .dn{color:var(--red)}
+.fb svg{width:13px;height:13px;stroke-width:1.75;fill:none;vertical-align:-2px;margin-right:2px}
+.fb-bar{width:70px;height:6px;border-radius:3px;background:var(--red);overflow:hidden;display:inline-block;vertical-align:middle}
+.fb-bar > i{display:block;height:100%;background:var(--green)}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="logo">
+    <svg viewBox="0 0 24 24"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M12 22V12M3 7l9 5 9-5"/></svg>
+    <span><b>AgentMesh</b> 运营后台</span>
+  </span>
+  <div class="top-search">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+    <input id="global-search" placeholder="全局搜索资产 / 实验 / 候选…">
+  </div>
+  <div class="spacer"></div>
+  <div class="env-switch" onclick="toast('演示环境，暂不支持切换','warn')">
+    <span class="dot"></span>Control Plane · 团队自用
+    <svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+  </div>
+  <div class="avatar" title="ops@team">OP</div>
+</div>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main"><div class="wrap">
+    <!-- 资产管理 -->
+    <section id="page-assets" class="page">
+      <div class="page-title">资产管理</div>
+      <div class="stats" id="assets-stats"></div>
+      <div class="panel">
+        <div class="panel-head">
+          <span class="ptitle">资产列表</span>
+          <span class="count" id="assets-count"></span>
+          <div class="hspacer"></div>
+          <div class="top-search" style="max-width:240px">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input id="asset-search" placeholder="按资产 ID 搜索…" oninput="renderAssets()">
+          </div>
+          <button class="btn-text mut" id="asset-clear" onclick="clearAssetFilter()" style="display:none">清空</button>
+        </div>
+        <table>
+          <thead><tr>
+            <th class="sortable" onclick="sortAssets('assetId')">资产 ID<span class="sort-ico">↕</span></th>
+            <th>名称</th>
+            <th class="sortable" onclick="sortAssets('vcount')">版本数<span class="sort-ico">↕</span></th>
+            <th>baseline</th><th>latest</th>
+            <th class="sortable" onclick="sortAssets('mtime')">更新时间<span class="sort-ico">↕</span></th>
+            <th></th>
+          </tr></thead>
+          <tbody id="assets-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 灰度实验 -->
+    <section id="page-experiments" class="page" style="display:none">
+      <div class="page-title">灰度实验</div>
+      <div class="panel">
+        <div class="panel-head">
+          <span class="ptitle">实验列表</span>
+          <span class="count" id="exps-count"></span>
+          <div class="hspacer"></div>
+          <select id="exp-filter" onchange="renderExps()">
+            <option value="">全部状态</option>
+            <option value="active">进行中</option>
+            <option value="paused">已暂停</option>
+            <option value="archived">已归档</option>
+          </select>
+          <button class="btn-text mut" id="exp-clear" onclick="clearExpFilter()" style="display:none">清空</button>
+          <button class="btn btn-primary btn-sm" onclick="openExpModal()">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>新建实验</button>
+        </div>
+        <table>
+          <thead><tr>
+            <th class="sortable" onclick="sortExps('name')">实验名称<span class="sort-ico">↕</span></th>
+            <th>关联资产</th><th>状态</th>
+            <th class="sortable" onclick="sortExps('vc')">variant 数<span class="sort-ico">↕</span></th>
+            <th>流量分配</th>
+            <th class="sortable" onclick="sortExps('ctime')">创建时间<span class="sort-ico">↕</span></th>
+            <th>操作</th>
+          </tr></thead>
+          <tbody id="exps-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 候选审核 -->
+    <section id="page-candidates" class="page" style="display:none">
+      <div class="page-title">skill 候选审核</div>
+      <div class="hint">Hermes 自进化层产出的 skill 改进候选，审核通过后打包发新版本进入灰度池。</div>
+      <div class="stats" id="cand-stats"></div>
+      <div class="panel">
+        <div class="panel-head">
+          <span class="ptitle">候选列表</span>
+          <span class="count" id="cands-count"></span>
+          <div class="hspacer"></div>
+          <select id="cand-filter" onchange="renderCands()">
+            <option value="">全部状态</option>
+            <option value="pending">待审核</option>
+            <option value="approved">已通过</option>
+            <option value="rejected">已驳回</option>
+            <option value="published">已发版</option>
+          </select>
+          <button class="btn-text mut" id="cand-clear" onclick="clearCandFilter()" style="display:none">清空</button>
+        </div>
+        <table>
+          <thead><tr>
+            <th>skill 名称</th><th>关联资产</th><th>基于版本</th><th>状态</th>
+            <th>来源轨迹</th>
+            <th class="sortable" onclick="sortCands('ctime')">提交时间<span class="sort-ico">↕</span></th>
+            <th>操作</th>
+          </tr></thead>
+          <tbody id="cands-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 遥测总览 -->
+    <section id="page-telemetry" class="page" style="display:none">
+      <div class="page-title">遥测总览</div>
+      <div class="hint">数据来自自托管 Langfuse，按实验 variant 聚合。反馈率来自客户端 👍/👎（PRD-07）。以下为示例数据。</div>
+      <div class="stats" id="tele-stats"></div>
+      <div class="panel">
+        <div class="panel-head"><span class="ptitle">实验结论 · 样本量进度</span><span class="count">按实验判定胜出 variant</span></div>
+        <table>
+          <thead><tr><th>实验</th><th>关联资产</th><th>样本进度</th><th>领先 variant</th><th>结论</th><th>操作</th></tr></thead>
+          <tbody id="conclusion-body"></tbody>
+        </table>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span class="ptitle">按 variant 聚合对比</span><span class="count">4 个 variant</span></div>
+        <table>
+          <thead><tr><th>variant（资产版本）</th><th>样本数</th><th>成功率</th><th>P50 时延</th><th>反馈（👍/👎）</th></tr></thead>
+          <tbody id="tele-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </div></main>
+</div>
+
+<!-- 抽屉 -->
+<div class="drawer-mask" id="drawer-mask" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <h3 id="drawer-title">详情</h3>
+    <svg class="close" viewBox="0 0 24 24" onclick="closeDrawer()"><path d="M18 6 6 18M6 6l12 12"/></svg>
+  </div>
+  <div class="drawer-body" id="drawer-body"></div>
+</div>
+
+<!-- 新建实验弹窗 -->
+<div class="mask" id="exp-mask">
+  <div class="modal">
+    <h3>新建灰度实验</h3>
+    <div class="form-item">
+      <label>实验名称 <span class="req">*</span></label>
+      <input id="f-exp-name" placeholder="如：coding-agent prompt 优化实验">
+      <div class="err" id="e-exp-name">请输入实验名称</div>
+    </div>
+    <div class="form-item">
+      <label>关联资产 <span class="req">*</span></label>
+      <select id="f-exp-asset"></select>
+    </div>
+    <div class="form-item">
+      <label>variant 分配 <span class="req">*</span>（版本串 + 流量%）</label>
+      <div id="variant-list"></div>
+      <button class="btn btn-default btn-sm" onclick="addVariantRow()" style="margin-top:4px">+ 添加 variant</button>
+      <div class="alloc-sum" id="alloc-sum"></div>
+      <div class="err" id="e-exp-var">至少配置 1 个带版本串的 variant</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-default" onclick="closeMask('exp-mask')">取消</button>
+      <button class="btn btn-primary" onclick="submitExp()">创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- 驳回弹窗 -->
+<div class="mask" id="reject-mask">
+  <div class="modal" style="width:420px">
+    <h3>驳回候选</h3>
+    <div class="form-item">
+      <label>驳回原因 <span class="req">*</span></label>
+      <textarea id="f-reject-reason" placeholder="说明驳回原因…"></textarea>
+      <div class="err" id="e-reject">请填写驳回原因</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-default" onclick="closeMask('reject-mask')">取消</button>
+      <button class="btn btn-primary" onclick="confirmReject()">确认驳回</button>
+    </div>
+  </div>
+</div>
+
+<!-- 通用确认弹窗 -->
+<div class="mask" id="confirm-mask">
+  <div class="modal" style="width:400px">
+    <h3 id="confirm-title">确认操作</h3>
+    <p id="confirm-msg" style="color:var(--t2);margin-bottom:8px"></p>
+    <div class="modal-foot">
+      <button class="btn btn-default" onclick="closeMask('confirm-mask')">取消</button>
+      <button class="btn btn-primary" id="confirm-ok">确认</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script>
+// ---------- 图标（Lucide 风格线性 SVG）----------
+const ICONS={
+  box:'<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+  flask:'<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7 15h10"/>',
+  sparkles:'<path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><path d="m6 6 2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/>',
+  chart:'<path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7"/><rect x="12" y="6" width="3" height="11"/><rect x="17" y="13" width="3" height="4"/>',
+  inbox:'<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5 6h14l3 6v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/>'
+};
+function svg(name,cls){return `<svg class="ico ${cls||''}" viewBox="0 0 24 24">${ICONS[name]}</svg>`;}
+
+// ---------- 数据 ----------
+let assets=[
+  {assetId:"coding-agent",name:"编码助手",versions:[
+    {version:"1.4.2",kitRef:"reg.local/coding@sha256:a1b2…",channel:"baseline",ctime:"2026-07-10"},
+    {version:"1.5.0",kitRef:"reg.local/coding@sha256:c3d4…",channel:"latest",ctime:"2026-07-18"},
+    {version:"1.5.0-canary",kitRef:"reg.local/coding@sha256:e5f6…",channel:"experiment",ctime:"2026-07-19"}
+  ]},
+  {assetId:"ops-agent",name:"运营/排障助手",versions:[
+    {version:"0.9.0",kitRef:"reg.local/ops@sha256:11aa…",channel:"baseline",ctime:"2026-07-12"},
+    {version:"1.0.0",kitRef:"reg.local/ops@sha256:22bb…",channel:"latest",ctime:"2026-07-17"}
+  ]},
+  {assetId:"biz-agent",name:"日常业务助手",versions:[
+    {version:"0.3.1",kitRef:"reg.local/biz@sha256:33cc…",channel:"baseline",ctime:"2026-07-15"}
+  ]}
+];
+let exps=[
+  {id:1,name:"coding prompt 优化",assetId:"coding-agent",status:"active",variants:[{v:"1.5.0",w:70},{v:"1.5.0-canary",w:30}],ctime:"2026-07-19"},
+  {id:2,name:"ops 排障策略 A/B",assetId:"ops-agent",status:"paused",variants:[{v:"0.9.0",w:50},{v:"1.0.0",w:50}],ctime:"2026-07-16"}
+];
+let expSeq=3;
+let cands=[
+  {id:1,skill:"git 冲突自动解决",assetId:"coding-agent",base:"1.5.0",status:"pending",trace:"lf-tr-88a1",ctime:"2026-07-19",
+   before:"@@ skill: resolve-conflict @@\n遇到冲突时中止并提示用户\n等待人工介入",
+   after:"@@ skill: resolve-conflict @@\n先尝试 3-way merge，无法自动解则按 hunk 列出\n保留双方改动并标注来源"},
+  {id:2,skill:"日志异常聚类",assetId:"ops-agent",base:"1.0.0",status:"pending",trace:"lf-tr-90c2",ctime:"2026-07-18",
+   before:"@@ skill: log-triage @@\n逐行扫描关键字 ERROR\n输出命中行",
+   after:"@@ skill: log-triage @@\n按堆栈指纹聚类，输出 top-N 异常簇\n关联最近一次发布时间线"},
+  {id:3,skill:"周报自动汇总",assetId:"biz-agent",base:"0.3.1",status:"published",trace:"lf-tr-71b0",ctime:"2026-07-15",
+   before:"@@ skill: weekly-digest @@\n单来源顺序读取",
+   after:"@@ skill: weekly-digest @@\n从多来源聚合并去重\n按优先级排序输出"}
+];
+let candSeq=4;
+const teleData=[
+  {v:"coding@1.5.0",n:6240,ok:"85.1%",p50:"2.2s",up:842,dn:238},
+  {v:"coding@1.5.0-canary",n:2680,ok:"89.4%",p50:"2.0s",up:520,dn:99},
+  {v:"ops@1.0.0",n:2410,ok:"83.2%",p50:"3.1s",up:310,dn:127},
+  {v:"biz@0.3.1",n:1150,ok:"88.0%",p50:"1.8s",up:220,dn:55}
+];
+// 实验结论（PRD-09/10）：样本进度 + 领先 variant，达标才可判定
+let conclusions=[
+  {expId:1,name:"coding prompt 优化",assetId:"coding-agent",samples:8920,need:8000,lead:"1.5.0-canary",leadGain:"+4.3% 成功率",decided:false},
+  {expId:2,name:"ops 排障策略 A/B",assetId:"ops-agent",samples:2410,need:8000,lead:"1.0.0",leadGain:"+2.1% 成功率",decided:false}
+];
+const chLabel={baseline:"baseline",latest:"latest",experiment:"experiment"};
+const stLabel={active:"进行中",paused:"已暂停",archived:"已归档",pending:"待审核",approved:"已通过",rejected:"已驳回",published:"已发版"};
+
+// ---------- 通用 ----------
+function toast(msg,type){const w=document.getElementById('toast-wrap');const t=document.createElement('div');t.className='toast '+(type||'');t.textContent=msg;w.appendChild(t);setTimeout(()=>t.remove(),2000);}
+function closeMask(id){document.getElementById(id).classList.remove('show');}
+function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+let pendingConfirm=null;
+function askConfirm(title,msg,fn){document.getElementById('confirm-title').textContent=title;document.getElementById('confirm-msg').textContent=msg;pendingConfirm=fn;document.getElementById('confirm-mask').classList.add('show');}
+document.getElementById('confirm-ok').onclick=function(){if(pendingConfirm)pendingConfirm();closeMask('confirm-mask');pendingConfirm=null;};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeDrawer();['exp-mask','reject-mask','confirm-mask'].forEach(closeMask);}});
+
+// 侧栏导航
+const NAV=[['assets','资产管理','box'],['experiments','灰度实验','flask'],['candidates','候选审核','sparkles'],['telemetry','遥测总览','chart']];
+function buildNav(){
+  document.getElementById('sidebar').innerHTML=NAV.map((n,i)=>
+    `<div class="nav-item${i===0?' active':''}" data-page="${n[0]}" onclick="switchPage('${n[0]}',this)">${svg(n[2])}${n[1]}</div>`).join('');
+}
+function switchPage(page,el){
+  document.querySelectorAll('.page').forEach(p=>p.style.display='none');
+  document.getElementById('page-'+page).style.display='';
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  el.classList.add('active');
+  closeDrawer();
+}
+
+// 抽屉
+function openDrawer(title,html){
+  document.getElementById('drawer-title').textContent=title;
+  document.getElementById('drawer-body').innerHTML=html;
+  document.getElementById('drawer').classList.add('show');
+  document.getElementById('drawer-mask').classList.add('show');
+}
+function closeDrawer(){document.getElementById('drawer').classList.remove('show');document.getElementById('drawer-mask').classList.remove('show');}
+
+// sparkline 生成
+function sparkline(points,color){
+  const w=64,h=22,max=Math.max(...points),min=Math.min(...points),rng=max-min||1;
+  const pts=points.map((p,i)=>`${(i/(points.length-1)*w).toFixed(1)},${(h-2-(p-min)/rng*(h-4)).toFixed(1)}`).join(' ');
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+// ---------- 骨架 ----------
+function skeletonRows(cols,tbody){
+  document.getElementById(tbody).innerHTML=Array(5).fill(0).map(()=>
+    '<tr class="skeleton">'+Array(cols).fill(0).map((_,i)=>`<td><div class="sk-bar" style="width:${[70,55,40,50,45,60,30][i]||50}%"></div></td>`).join('')+'</tr>').join('');
+}
+// ---------- 资产页 ----------
+let assetSort={key:null,dir:1};
+function renderAssetStats(){
+  const inExp=new Set(exps.filter(e=>e.status==='active').map(e=>e.assetId));
+  const cards=[
+    {lbl:'资产总数',ico:'box',num:assets.length,trend:'+1',td:'up',sp:[2,2,2,3,3,3],pri:false},
+    {lbl:'实验中资产',ico:'flask',num:inExp.size,trend:'+1',td:'up',sp:[0,1,0,1,1,1],pri:true},
+    {lbl:'版本总数',ico:'chart',num:assets.reduce((s,a)=>s+a.versions.length,0),trend:'+2',td:'up',sp:[3,4,4,5,5,6],pri:false}
+  ];
+  document.getElementById('assets-stats').innerHTML=cards.map(c=>
+    `<div class="stat-card"><div class="lbl">${svg(c.ico,'ico-sm')}${c.lbl}</div>
+     <div class="num${c.pri?' pri':''}">${c.num}</div>
+     <div class="trend ${c.td}">${c.td==='up'?'↑':c.td==='down'?'↓':'→'}${c.trend}</div>
+     ${sparkline(c.sp,c.pri?'#3b82f6':'#3fb950')}</div>`).join('');
+}
+function sortAssets(key){assetSort.dir=assetSort.key===key?-assetSort.dir:1;assetSort.key=key;renderAssets();}
+function clearAssetFilter(){document.getElementById('asset-search').value='';renderAssets();}
+function renderAssets(){
+  renderAssetStats();
+  const kw=(document.getElementById('asset-search').value||'').toLowerCase();
+  document.getElementById('asset-clear').style.display=kw?'':'none';
+  let list=assets.map((a,idx)=>({...a,_idx:idx})).filter(a=>a.assetId.toLowerCase().includes(kw));
+  if(assetSort.key){
+    list.sort((a,b)=>{
+      let x,y;
+      if(assetSort.key==='assetId'){x=a.assetId;y=b.assetId;}
+      else if(assetSort.key==='vcount'){x=a.versions.length;y=b.versions.length;}
+      else{x=a.versions.map(v=>v.ctime).sort().slice(-1)[0];y=b.versions.map(v=>v.ctime).sort().slice(-1)[0];}
+      return (x>y?1:x<y?-1:0)*assetSort.dir;
+    });
+  }
+  if(assetSort.key)markSort('assets',assetSort.key,assetSort.dir);
+  document.getElementById('assets-count').textContent=`共 ${list.length} 条`;
+  const body=document.getElementById('assets-body');
+  if(!list.length){body.innerHTML=`<tr><td colspan="7"><div class="empty">${svg('inbox')}无匹配资产<br><button class="btn-text" onclick="clearAssetFilter()">清空筛选</button></div></td></tr>`;return;}
+  body.innerHTML=list.map(a=>{
+    const base=a.versions.find(v=>v.channel==='baseline'),lat=a.versions.find(v=>v.channel==='latest');
+    const mt=a.versions.map(v=>v.ctime).sort().slice(-1)[0];
+    return `<tr class="clickable" onclick="openAsset(${a._idx})">
+      <td class="mono">${esc(a.assetId)}</td><td>${esc(a.name)}</td>
+      <td>${a.versions.length}</td>
+      <td>${base?'<span class="mono">'+esc(base.version)+'</span>':'-'}</td>
+      <td>${lat?'<span class="mono">'+esc(lat.version)+'</span>':'-'}</td>
+      <td class="mono">${mt}</td>
+      <td class="arrow">›</td></tr>`;
+  }).join('');
+}
+function openAsset(i){
+  const a=assets[i];
+  const html=`
+    <h4>基本信息</h4>
+    <div class="kv"><span class="k">资产 ID</span><span class="mono">${esc(a.assetId)}</span></div>
+    <div class="kv"><span class="k">名称</span><span>${esc(a.name)}</span></div>
+    <div class="kv"><span class="k">版本总数</span><span>${a.versions.length}</span></div>
+    <h4>版本列表</h4>
+    <table class="sub-table"><thead><tr><th>版本串</th><th>KitOps ref</th><th>通道</th><th>创建</th></tr></thead>
+    <tbody>${a.versions.map(v=>`<tr><td class="mono">${esc(v.version)}</td><td class="mono">${esc(v.kitRef)}</td><td><span class="badge ${v.channel}">${chLabel[v.channel]}</span></td><td class="mono">${v.ctime}</td></tr>`).join('')}</tbody></table>`;
+  openDrawer(a.assetId+' · 资产详情',html);
+}
+// 排序图标：标记激活列 + 方向
+function markSort(page,key,dir){
+  document.querySelectorAll(`#page-${page} thead th.sortable`).forEach(th=>{
+    const oc=th.getAttribute('onclick')||'';
+    const ico=th.querySelector('.sort-ico');
+    if(oc.includes("'"+key+"'")){th.classList.add('sorted');if(ico)ico.textContent=dir>0?'↑':'↓';}
+    else{th.classList.remove('sorted');if(ico)ico.textContent='↕';}
+  });
+}
+// ---------- 实验页 ----------
+let expSort={key:null,dir:1};
+function sortExps(key){expSort.dir=expSort.key===key?-expSort.dir:1;expSort.key=key;renderExps();}
+function clearExpFilter(){document.getElementById('exp-filter').value='';renderExps();}
+function renderExps(){
+  const f=document.getElementById('exp-filter').value;
+  document.getElementById('exp-clear').style.display=f?'':'none';
+  let list=exps.filter(e=>!f||e.status===f);
+  if(expSort.key){
+    list=[...list].sort((a,b)=>{
+      let x,y;
+      if(expSort.key==='name'){x=a.name;y=b.name;}
+      else if(expSort.key==='vc'){x=a.variants.length;y=b.variants.length;}
+      else{x=a.ctime;y=b.ctime;}
+      return (x>y?1:x<y?-1:0)*expSort.dir;
+    });
+    markSort('experiments',expSort.key,expSort.dir);
+  }
+  document.getElementById('exps-count').textContent=`共 ${list.length} 条`;
+  const body=document.getElementById('exps-body');
+  if(!list.length){body.innerHTML=`<tr><td colspan="7"><div class="empty">${svg('inbox')}无匹配实验</div></td></tr>`;return;}
+  body.innerHTML=list.map(e=>{
+    const alloc=e.variants.map(v=>esc(v.v)+' '+v.w+'%').join(' / ');
+    const toggle=e.status==='active'?`<button class="btn-text" onclick="event.stopPropagation();setExpStatus(${e.id},'paused')">暂停</button>`
+      :e.status==='paused'?`<button class="btn-text" onclick="event.stopPropagation();setExpStatus(${e.id},'active')">恢复</button>`:'';
+    const arch=e.status!=='archived'?`<button class="btn-text danger" onclick="event.stopPropagation();archiveExp(${e.id})">归档</button>`:'<span style="color:var(--t3)">-</span>';
+    return `<tr class="clickable" onclick="openExp(${e.id})">
+      <td>${esc(e.name)}</td>
+      <td class="mono">${esc(e.assetId)}</td>
+      <td><span class="badge ${e.status}">${stLabel[e.status]}</span></td>
+      <td>${e.variants.length}</td>
+      <td class="mono">${alloc}</td>
+      <td class="mono">${e.ctime}</td>
+      <td onclick="event.stopPropagation()">${toggle}${arch}</td></tr>`;
+  }).join('');
+}
+function openExp(id){
+  const e=exps.find(x=>x.id===id);if(!e)return;
+  const html=`
+    <h4>基本信息</h4>
+    <div class="kv"><span class="k">实验名称</span><span>${esc(e.name)}</span></div>
+    <div class="kv"><span class="k">关联资产</span><span class="mono">${esc(e.assetId)}</span></div>
+    <div class="kv"><span class="k">状态</span><span class="badge ${e.status}">${stLabel[e.status]}</span></div>
+    <div class="kv"><span class="k">创建时间</span><span class="mono">${e.ctime}</span></div>
+    <h4>variant 指标（Langfuse 聚合，示例）</h4>
+    <table class="sub-table"><thead><tr><th>variant</th><th>流量</th><th>成功率</th><th>P50</th><th>反馈</th></tr></thead>
+    <tbody>${e.variants.map((v,idx)=>`<tr><td class="mono">${esc(v.v)}</td><td>${v.w}%</td><td>${[85,89,83,88][idx%4]}.${idx}%</td><td>${(2+idx*0.3).toFixed(1)}s</td><td>${[78,84,71,80][idx%4]}%</td></tr>`).join('')}</tbody></table>`;
+  openDrawer(e.name+' · 实验详情',html);
+}
+function setExpStatus(id,st){const e=exps.find(x=>x.id===id);if(!e)return;e.status=st;renderExps();toast(st==='active'?'实验已恢复':'实验已暂停',st==='active'?'ok':'warn');}
+function archiveExp(id){const e=exps.find(x=>x.id===id);if(!e)return;askConfirm('归档实验','确认归档「'+e.name+'」？归档后停止分流，胜出 variant 可提为新 baseline。',function(){e.status='archived';renderExps();renderAssetStats();toast('实验已归档','ok');});}
+// 新建实验
+function openExpModal(){
+  document.getElementById('f-exp-name').value='';
+  const sel=document.getElementById('f-exp-asset');
+  sel.innerHTML=assets.map(a=>`<option value="${esc(a.assetId)}">${esc(a.assetId)} - ${esc(a.name)}</option>`).join('');
+  document.getElementById('variant-list').innerHTML='';
+  addVariantRow();addVariantRow();
+  document.getElementById('e-exp-name').classList.remove('show');
+  document.getElementById('e-exp-var').classList.remove('show');
+  updateAllocSum();
+  document.getElementById('exp-mask').classList.add('show');
+}
+function addVariantRow(){
+  const box=document.getElementById('variant-list');
+  const row=document.createElement('div');row.className='variant-row';
+  row.innerHTML=`<input class="v-ver" placeholder="版本串 如 1.5.0-canary"><input class="v-w w" type="number" placeholder="流量%" min="0" max="100" oninput="updateAllocSum()"><button class="btn-text danger" onclick="this.parentNode.remove();updateAllocSum()">✕</button>`;
+  box.appendChild(row);
+}
+function currentAlloc(){return [...document.querySelectorAll('#variant-list .variant-row')].reduce((s,r)=>s+(parseInt(r.querySelector('.v-w').value)||0),0);}
+function updateAllocSum(){
+  const sum=currentAlloc();const el=document.getElementById('alloc-sum');
+  el.textContent=`流量合计：${sum}%（需 = 100%）`;
+  el.className='alloc-sum '+(sum===100?'ok':'bad');
+}
+function submitExp(){
+  const name=document.getElementById('f-exp-name').value.trim();
+  const asset=document.getElementById('f-exp-asset').value;
+  const rows=[...document.querySelectorAll('#variant-list .variant-row')];
+  const variants=rows.map(r=>({v:r.querySelector('.v-ver').value.trim(),w:parseInt(r.querySelector('.v-w').value)||0})).filter(x=>x.v);
+  let bad=false;
+  document.getElementById('e-exp-name').classList.toggle('show',!name);if(!name)bad=true;
+  document.getElementById('e-exp-var').classList.toggle('show',!variants.length);if(!variants.length)bad=true;
+  const sum=variants.reduce((s,v)=>s+v.w,0);
+  if(sum!==100){updateAllocSum();toast('流量合计必须为 100%，当前 '+sum+'%','warn');bad=true;}
+  if(bad)return;
+  exps.unshift({id:expSeq++,name:name,assetId:asset,status:'active',variants:variants,ctime:'2026-07-20'});
+  closeMask('exp-mask');renderExps();renderAssetStats();
+  toast('实验已创建，client 将按流量绑定 variant','ok');
+}
+// ---------- 候选审核页 ----------
+let candSort={key:null,dir:1};
+function sortCands(key){candSort.dir=candSort.key===key?-candSort.dir:1;candSort.key=key;renderCands();}
+function clearCandFilter(){document.getElementById('cand-filter').value='';renderCands();}
+function renderCandStats(){
+  // PRD-08：候选通过率 / 审核积压监控（含历史已处理，用固定基数模拟趋势）
+  const hist={approved:7,rejected:4,published:5}; // 历史已处理基数
+  const cur={pending:0,approved:0,rejected:0,published:0};
+  cands.forEach(c=>cur[c.status]++);
+  const approved=hist.approved+cur.approved+hist.published+cur.published;
+  const rejected=hist.rejected+cur.rejected;
+  const rate=Math.round(approved/(approved+rejected)*100);
+  const pending=cur.pending;
+  const rateTd=rate>=40?'up':'down', rateSp=[38,41,44,43,46,rate];
+  const backlogWarn=pending>=3;
+  const cards=[
+    {lbl:'候选通过率',ico:'sparkles',num:rate+'%',trend:(rate>=40?'达标 ≥40%':'低于阈值 40%'),td:rateTd,sp:rateSp,pri:true},
+    {lbl:'待审积压',ico:'inbox',num:pending,trend:backlogWarn?'需处理':'健康',td:backlogWarn?'down':'flat',sp:[1,2,2,3,2,pending],pri:false},
+    {lbl:'累计已处理',ico:'chart',num:approved+rejected,trend:'+'+(cur.approved+cur.rejected+cur.published),td:'up',sp:[9,11,13,14,15,approved+rejected],pri:false}
+  ];
+  document.getElementById('cand-stats').innerHTML=cards.map(c=>
+    `<div class="stat-card"><div class="lbl">${svg(c.ico,'ico-sm')}${c.lbl}</div>
+     <div class="num${c.pri?' pri':''}">${c.num}</div>
+     <div class="trend ${c.td}">${c.td==='up'?'↑':c.td==='down'?'↓':'→'}${c.trend}</div>
+     ${sparkline(c.sp,c.pri?(rate>=40?'#3fb950':'#f85149'):'#3fb950')}</div>`).join('');
+}
+function renderCands(){
+  renderCandStats();
+  const f=document.getElementById('cand-filter').value;
+  document.getElementById('cand-clear').style.display=f?'':'none';
+  let list=cands.filter(c=>!f||c.status===f);
+  if(candSort.key){list=[...list].sort((a,b)=>(a.ctime>b.ctime?1:a.ctime<b.ctime?-1:0)*candSort.dir);markSort('candidates',candSort.key,candSort.dir);}
+  document.getElementById('cands-count').textContent=`共 ${list.length} 条`;
+  const body=document.getElementById('cands-body');
+  if(!list.length){body.innerHTML=`<tr><td colspan="7"><div class="empty">${svg('inbox')}无匹配候选</div></td></tr>`;return;}
+  body.innerHTML=list.map(c=>{
+    const ops=c.status==='pending'
+      ?`<button class="btn-text" onclick="event.stopPropagation();approveCand(${c.id})">通过</button><button class="btn-text danger" onclick="event.stopPropagation();openReject(${c.id})">驳回</button>`
+      :'<span style="color:var(--t3)">已处理</span>';
+    return `<tr class="clickable" onclick="openCand(${c.id})">
+      <td>${esc(c.skill)}</td>
+      <td class="mono">${esc(c.assetId)}</td>
+      <td class="mono">${esc(c.base)}</td>
+      <td><span class="badge ${c.status==='published'?'pub':c.status}">${stLabel[c.status]}</span></td>
+      <td class="mono">${esc(c.trace)}</td>
+      <td class="mono">${c.ctime}</td>
+      <td onclick="event.stopPropagation()">${ops}</td></tr>`;
+  }).join('');
+}
+function diffCol(text,cls){
+  return text.split('\n').map(l=>`<span class="${cls}">${esc(l)}</span>`).join('');
+}
+function openCand(id){
+  const c=cands.find(x=>x.id===id);if(!c)return;
+  const html=`
+    <h4>基本信息</h4>
+    <div class="kv"><span class="k">skill 名称</span><span>${esc(c.skill)}</span></div>
+    <div class="kv"><span class="k">关联资产</span><span class="mono">${esc(c.assetId)}</span></div>
+    <div class="kv"><span class="k">基于版本</span><span class="mono">${esc(c.base)}</span></div>
+    <div class="kv"><span class="k">来源轨迹</span><span class="mono">${esc(c.trace)}</span></div>
+    <div class="kv"><span class="k">状态</span><span class="badge ${c.status==='published'?'pub':c.status}">${stLabel[c.status]}</span></div>
+    <h4>并排对比（基于版本 vs 候选）</h4>
+    <div class="diff2">
+      <div class="col"><div class="col-head">基于 ${esc(c.base)}（当前）</div><pre>${diffCol(c.before,'del')}</pre></div>
+      <div class="col"><div class="col-head">候选改进</div><pre>${diffCol(c.after,'add')}</pre></div>
+    </div>
+    ${c.reject?'<h4>驳回原因</h4><p style="color:var(--red)">'+esc(c.reject)+'</p>':''}
+    ${c.status==='pending'?`<div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary btn-sm" onclick="approveCand(${c.id})">通过并发版</button><button class="btn btn-default btn-sm" onclick="openReject(${c.id})">驳回</button></div>`:''}`;
+  openDrawer(c.skill+' · 候选详情',html);
+}
+function approveCand(id){
+  const c=cands.find(x=>x.id===id);if(!c)return;
+  askConfirm('审核通过','通过「'+c.skill+'」？将打包为新版本并发布进灰度池。',function(){c.status='published';renderCands();closeDrawer();toast('已发版进灰度池 ✓','ok');});
+}
+let rejectTarget=null;
+function openReject(id){rejectTarget=id;document.getElementById('f-reject-reason').value='';document.getElementById('e-reject').classList.remove('show');document.getElementById('reject-mask').classList.add('show');}
+function confirmReject(){
+  const reason=document.getElementById('f-reject-reason').value.trim();
+  if(!reason){document.getElementById('e-reject').classList.add('show');return;}
+  const c=cands.find(x=>x.id===rejectTarget);if(c){c.status='rejected';c.reject=reason;}
+  closeMask('reject-mask');renderCands();closeDrawer();rejectTarget=null;toast('候选已驳回','warn');
+}
+// ---------- 遥测页 ----------
+function renderTele(){
+  const cards=[
+    {lbl:'总 trace 数',ico:'chart',num:'12,480',trend:'+8%',td:'up',sp:[8,9,10,11,12,12],pri:false},
+    {lbl:'平均成功率',ico:'sparkles',num:'86.3%',trend:'+2.1%',td:'up',sp:[82,83,84,85,86,86],pri:true},
+    {lbl:'平均时延',ico:'flask',num:'2.4s',trend:'-0.3s',td:'down',sp:[3,2.8,2.7,2.5,2.4,2.4],pri:false},
+    {lbl:'反馈数',ico:'inbox',num:'318',trend:'+24',td:'up',sp:[260,270,285,300,310,318],pri:false}
+  ];
+  document.getElementById('tele-stats').innerHTML=cards.map(c=>
+    `<div class="stat-card"><div class="lbl">${svg(c.ico,'ico-sm')}${c.lbl}</div>
+     <div class="num${c.pri?' pri':''}">${c.num}</div>
+     <div class="trend ${c.td}">${c.td==='up'?'↑':c.td==='down'?'↓':'→'}${c.trend}</div>
+     ${sparkline(c.sp,c.pri?'#3b82f6':c.td==='down'?'#3fb950':'#3fb950')}</div>`).join('');
+  document.getElementById('tele-body').innerHTML=teleData.map(t=>{
+    const total=t.up+t.dn, pct=Math.round(t.up/total*100);
+    return `<tr><td class="mono">${esc(t.v)}</td><td>${t.n.toLocaleString()}</td><td>${t.ok}</td><td>${t.p50}</td>
+      <td><div class="fb"><span class="fb-bar"><i style="width:${pct}%"></i></span>
+      <span class="up"><svg viewBox="0 0 24 24"><path d="M7 10v11M2 12h5v9H2zM7 10l4-8a2 2 0 0 1 2 2v4h5a2 2 0 0 1 2 2.5l-2 7a2 2 0 0 1-2 1.5H7"/></svg>${t.up}</span>
+      <span class="dn">${t.dn}</span></div></td></tr>`;
+  }).join('');
+  renderConclusions();
+}
+// PRD-09/10：实验结论 + 样本量进度 + 一键提 baseline
+function renderConclusions(){
+  document.getElementById('conclusion-body').innerHTML=conclusions.map(c=>{
+    const pct=Math.min(100,Math.round(c.samples/c.need*100));
+    const reached=c.samples>=c.need;
+    const prog=`<span class="progress ${reached?'full':''}"><i style="width:${pct}%"></i></span><span class="prog-txt">${c.samples.toLocaleString()}/${c.need.toLocaleString()}（${pct}%）</span>`;
+    let conclusion,op;
+    if(c.decided){conclusion=`<span class="badge win">已提 baseline：${esc(c.lead)}</span>`;op='<span style="color:var(--t3)">已生效</span>';}
+    else if(reached){conclusion=`<span class="badge lead">显著 · ${esc(c.leadGain)}</span>`;op=`<button class="btn-text" onclick="promoteBaseline(${c.expId})">提为 baseline</button>`;}
+    else{conclusion='<span style="color:var(--t3)">样本不足，继续采集</span>';op=`<button class="btn-text mut" disabled style="cursor:not-allowed;opacity:.5">提为 baseline</button>`;}
+    return `<tr><td>${esc(c.name)}</td><td class="mono">${esc(c.assetId)}</td><td>${prog}</td>
+      <td class="mono">${esc(c.lead)}</td><td>${conclusion}</td><td>${op}</td></tr>`;
+  }).join('');
+}
+function promoteBaseline(expId){
+  const c=conclusions.find(x=>x.expId===expId);if(!c)return;
+  askConfirm('提为 baseline','将实验「'+c.name+'」的胜出 variant '+c.lead+' 提为新 baseline？后续新 client 将默认绑定该版本，闭环接回会话启动。',function(){
+    c.decided=true;
+    // 同步资产通道：把该 variant 版本设为 baseline
+    const a=assets.find(x=>x.assetId===c.assetId);
+    if(a){a.versions.forEach(v=>{if(v.channel==='baseline')v.channel='latest';});
+      const win=a.versions.find(v=>v.version===c.lead)||a.versions.find(v=>v.version.startsWith(c.lead));
+      if(win)win.channel='baseline';}
+    // 归档实验
+    const e=exps.find(x=>x.id===expId);if(e)e.status='archived';
+    renderConclusions();renderAssets();renderExps();
+    toast('已提为 baseline，实验归档 ✓','ok');
+  });
+}
+// ---------- init（含骨架屏演示）----------
+buildNav();
+skeletonRows(7,'assets-body');skeletonRows(7,'exps-body');skeletonRows(7,'cands-body');
+setTimeout(()=>{renderAssets();renderExps();renderCands();renderTele();},450);
+</script>
+</body>
+</html>

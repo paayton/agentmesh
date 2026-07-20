@@ -1,0 +1,17 @@
+# 环境与密钥
+.env
+*.local
+**/.env
+
+# OS / 编辑器
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# 依赖与构建产物
+node_modules/
+__pycache__/
+*.pyc
+dist/
+build/

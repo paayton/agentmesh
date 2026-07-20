@@ -1,0 +1,96 @@
+# AgentMesh M0 环境骨架 —— 团队服务器一套 compose
+# 范围：GrowthBook(L3 灰度) + Zot(L2 OCI Registry / ClawHub 存储)
+# 说明：Langfuse(L4) 使用团队已部署的现有实例，通过 .env 的 LANGFUSE_* 接入，不在此起栈。
+#       agentmesh-api / hermes-worker 待 M1/M3 代码就绪后加入（见文末占位）。
+# 用法：cp .env.example .env && 填值 && docker compose up -d
+services:
+
+  # ---------- L3 灰度实验：GrowthBook (MIT) ----------
+  # 单容器暴露 3000(UI) + 3100(API)，依赖 MongoDB。
+  growthbook:
+    image: growthbook/growthbook:latest
+    container_name: agentmesh-growthbook
+    depends_on:
+      - growthbook-mongo
+    ports:
+      - "${GB_UI_PORT:-3000}:3000"
+      - "${GB_API_PORT:-3100}:3100"
+    environment:
+      # 生产务必改这两个地址为团队内网可达地址
+      APP_ORIGIN: "${GB_APP_ORIGIN:-http://localhost:3000}"
+      API_HOST: "${GB_API_HOST:-http://localhost:3100}"
+      MONGODB_URI: "mongodb://growthbook-mongo:27017/growthbook"
+      # JWT 密钥：生产必须用 .env 覆盖为强随机值
+      JWT_SECRET: "${GB_JWT_SECRET:?set GB_JWT_SECRET in .env}"
+    volumes:
+      - gb-uploads:/usr/local/src/app/packages/back-end/uploads
+    restart: unless-stopped
+
+  growthbook-mongo:
+    image: mongo:7
+    container_name: agentmesh-gb-mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: "${GB_MONGO_USER:-root}"
+      MONGO_INITDB_ROOT_PASSWORD: "${GB_MONGO_PASS:?set GB_MONGO_PASS in .env}"
+    volumes:
+      - gb-mongo-data:/data/db
+    restart: unless-stopped
+
+  # ---------- L2 资产仓库：Zot OCI Registry (Apache-2.0, CNCF) ----------
+  # 存 KitOps ModelKit。kit push/pull 直接对接此 registry。
+  registry:
+    image: ghcr.io/project-zot/zot-linux-amd64:latest
+    container_name: agentmesh-registry
+    ports:
+      - "${REGISTRY_PORT:-5000}:5000"
+    volumes:
+      - registry-data:/var/lib/registry
+      - ./zot-config.json:/etc/zot/config.json:ro
+    restart: unless-stopped
+
+  # ---------- L1 模型路由：LiteLLM Proxy (MIT) ----------
+  # 统一路由云端厂商（Claude/OpenAI/Kimi 等），集中管密钥+成本+限流+审计。
+  # 客户端只持 LITELLM_MASTER_KEY 走此 proxy，不接触厂商原始密钥。
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: agentmesh-litellm
+    ports:
+      - "${LITELLM_PORT:-4000}:4000"
+    environment:
+      LITELLM_MASTER_KEY: "${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}"
+      # 厂商密钥：从 .env 注入，仅存于此容器，不下发客户端
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      MOONSHOT_API_KEY: "${MOONSHOT_API_KEY:-}"
+      # 上报 Langfuse（复用团队现有实例）
+      LANGFUSE_HOST: "${LANGFUSE_HOST:-}"
+      LANGFUSE_PUBLIC_KEY: "${LANGFUSE_PUBLIC_KEY:-}"
+      LANGFUSE_SECRET_KEY: "${LANGFUSE_SECRET_KEY:-}"
+    volumes:
+      - ./litellm-config.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    restart: unless-stopped
+
+  # ---------- L4 遥测：Langfuse ----------
+  # 使用团队已部署的现有实例，不在此起栈。连接信息见 .env：
+  #   LANGFUSE_HOST / LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY
+  # LiteLLM Proxy 与 agentmesh-api 从环境变量读取上报地址。
+
+  # ---------- 中台 / 自进化（占位，M1/M3 代码就绪后启用）----------
+  # agentmesh-api:
+  #   build: ../services/agentmesh-api
+  #   ports: ["${API_PORT:-8000}:8000"]
+  #   environment:
+  #     GROWTHBOOK_API: "http://growthbook:3100"
+  #     REGISTRY_HOST: "registry:5000"
+  #     LANGFUSE_HOST: "${LANGFUSE_HOST}"
+  #     LANGFUSE_PUBLIC_KEY: "${LANGFUSE_PUBLIC_KEY}"
+  #     LANGFUSE_SECRET_KEY: "${LANGFUSE_SECRET_KEY}"
+  #   depends_on: [growthbook, registry]
+  # hermes-worker:
+  #   build: ../services/hermes-worker
+
+volumes:
+  gb-mongo-data:
+  gb-uploads:
+  registry-data:

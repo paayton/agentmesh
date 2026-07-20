@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentMesh 闭环全景图</title>
+<style>
+:root{
+  --bg:#0d1117; --surface:#161b22; --surface-2:#1c2128; --overlay:#1c2128;
+  --border:#30363d; --border-mut:#21262d;
+  --t1:#e6edf3; --t2:#7d8590; --t3:#6e7681;
+  --primary:#3b82f6; --primary-h:#4c8ef7; --primary-bg:#132033;
+  --green:#3fb950; --green-bg:#12261a; --yellow:#d29922; --yellow-bg:#251d0e;
+  --red:#f85149; --red-bg:#2a1416; --blue:#3b82f6; --blue-bg:#132033;
+  --gray:#7d8590; --gray-bg:#1c2128;
+  --font:"PingFang SC","Microsoft YaHei",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --mono:"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);font-size:13px;line-height:20px;color:var(--t1);background:var(--bg);min-height:100vh}
+svg{display:block}
+.topbar{height:48px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:10px;position:sticky;top:0;z-index:50}
+.topbar .logo{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+.topbar .logo b{color:var(--primary)}
+.topbar .logo svg{width:20px;height:20px;stroke:var(--primary);stroke-width:1.75;fill:none}
+.topbar .sub{color:var(--t2);font-size:12px;border-left:1px solid var(--border);padding-left:10px}
+.wrap{max-width:1280px;margin:0 auto;padding:24px 20px 60px}
+.h1{font-size:18px;font-weight:600;margin-bottom:4px}
+.lead{color:var(--t2);font-size:13px;margin-bottom:20px}
+.goal{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--primary);border-radius:6px;padding:12px 16px;margin-bottom:24px;font-size:13px;color:var(--t1)}
+.goal b{color:var(--primary)}
+.section-t{font-size:13px;color:var(--t2);font-weight:400;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+.section-t svg{width:16px;height:16px;stroke:var(--t2);stroke-width:1.75;fill:none}
+/* legend */
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;font-size:12px;color:var(--t2)}
+.legend .item{display:flex;align-items:center;gap:6px}
+.legend .sw{width:10px;height:10px;border-radius:3px}
+/* loop grid */
+.loop{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:10px}
+.node{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;cursor:pointer;transition:border-color .12s,background .12s;position:relative}
+.node:hover{border-color:var(--primary);background:var(--surface-2)}
+.node .idx{position:absolute;top:10px;right:12px;font-family:var(--mono);font-size:12px;color:var(--t3)}
+.node .nt{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.node .nt svg{width:16px;height:16px;stroke-width:1.75;fill:none}
+.node .nd{font-size:12px;color:var(--t2);line-height:18px;margin-bottom:10px}
+.node .tags{display:flex;gap:6px;flex-wrap:wrap}
+.tag{font-size:11px;line-height:18px;padding:0 6px;border-radius:4px;font-family:var(--mono)}
+.tag.role{background:var(--primary-bg);color:var(--primary)}
+.tag.fr{background:var(--gray-bg);color:var(--t2)}
+.node.client{border-top:2px solid var(--green)}
+.node.platform{border-top:2px solid var(--primary)}
+.node.auto{border-top:2px solid var(--yellow)}
+.flow-row{text-align:center;color:var(--t3);font-family:var(--mono);font-size:16px;margin:2px 0 10px;letter-spacing:2px}
+/* measure band */
+.measure{background:linear-gradient(180deg,var(--surface),var(--surface-2));border:1px dashed var(--border);border-radius:8px;padding:12px 16px;margin:14px 0 24px;display:flex;align-items:center;gap:12px}
+.measure svg{width:18px;height:18px;stroke:var(--primary);stroke-width:1.75;fill:none;flex:none}
+.measure .mt{font-size:13px;font-weight:600}
+.measure .md{font-size:12px;color:var(--t2)}
+/* roles */
+.roles{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:24px}
+.role-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px}
+.role-card .rn{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.role-card .rn svg{width:15px;height:15px;stroke-width:1.75;fill:none}
+.role-card .rd{font-size:12px;color:var(--t2);line-height:17px}
+.role-card .rt{font-size:11px;color:var(--t3);margin-top:8px;font-family:var(--mono)}
+/* health */
+.health{display:flex;gap:8px;margin-bottom:24px}
+.hc{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;position:relative}
+.hc .hl{font-size:12px;color:var(--t2)}
+.hc .hn{font-size:22px;font-weight:600;margin-top:4px}
+.hc .ht{position:absolute;top:12px;right:14px;font-size:12px;font-weight:500}
+.hc .hnote{font-size:11px;color:var(--t3);margin-top:2px}
+.up{color:var(--green)} .down{color:var(--red)}
+/* drawer */
+.mask{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;z-index:80}
+.mask.show{display:block}
+.drawer{position:fixed;top:0;right:0;height:100vh;width:460px;max-width:92vw;background:var(--surface);border-left:1px solid var(--border);z-index:90;transform:translateX(100%);transition:transform .2s ease;display:flex;flex-direction:column}
+.drawer.show{transform:translateX(0)}
+.dhead{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)}
+.dhead h3{font-size:14px;font-weight:600;flex:1}
+.dhead .x{cursor:pointer;width:20px;height:20px;stroke:var(--t2);stroke-width:1.75;fill:none}
+.dhead .x:hover{stroke:var(--t1)}
+.dbody{padding:16px;overflow-y:auto;flex:1}
+.dbody h4{font-size:12px;color:var(--t2);font-weight:400;margin:14px 0 6px}
+.dbody h4:first-child{margin-top:0}
+.dbody p{font-size:13px;color:var(--t1);line-height:19px;margin-bottom:8px}
+.kv{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-mut);font-size:13px}
+.kv .k{color:var(--t2)}
+.mono{font-family:var(--mono);font-size:12px;color:var(--t2)}
+.badge{display:inline-flex;align-items:center;font-size:12px;line-height:18px;padding:0 6px;border-radius:4px}
+.badge.p0{background:var(--red-bg);color:var(--red)}
+.badge.p1{background:var(--yellow-bg);color:var(--yellow)}
+.badge.p2{background:var(--gray-bg);color:var(--t2)}
+ul.reqs{list-style:none;margin-top:4px}
+ul.reqs li{padding:6px 0;border-bottom:1px solid var(--border-mut);font-size:12px;display:flex;gap:8px;align-items:baseline}
+ul.reqs li .id{font-family:var(--mono);color:var(--t3);flex:none}
+@media(max-width:900px){.loop,.roles{grid-template-columns:repeat(2,1fr)}.health{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="logo"><svg viewBox="0 0 24 24"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M12 22V12M3 7l9 5 9-5"/></svg><span><b>AgentMesh</b> 闭环全景图</span></span>
+  <span class="sub">Product Closed-Loop · 团队自用</span>
+</div>
+<div class="wrap">
+  <div class="h1">产品闭环全景</div>
+  <div class="lead">本地执行 → 云端资产 → 技能沉淀 → 灰度迭代。点击任一环节查看职责、角色与关联需求。</div>
+  <div class="goal"><b>北极星</b>：让小团队在数据不出本地的前提下，把"用 Agent 干活"变成能自我度量、自我进化的闭环——每个版本好不好有数据说话，好的版本自动沉淀、灰度、发布。独特价值 = <b>灰度 + 遥测 + 自进化</b> 三者串成回路。</div>
+
+  <div class="section-t"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9"/><path d="M3 4v5h5"/></svg>闭环链路（6 环 + 度量层）</div>
+  <div class="legend">
+    <span class="item"><span class="sw" style="background:var(--green)"></span>终端使用者侧</span>
+    <span class="item"><span class="sw" style="background:var(--primary)"></span>平台/运营侧</span>
+    <span class="item"><span class="sw" style="background:var(--yellow)"></span>自进化系统</span>
+    <span class="item">● 点击节点看详情</span>
+  </div>
+  <div class="loop" id="loop"></div>
+  <div class="measure">
+    <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7"/><rect x="12" y="6" width="3" height="11"/><rect x="17" y="13" width="3" height="4"/></svg>
+    <div><div class="mt">度量层 · Langfuse 按 variant 聚合（贯穿全环）</div><div class="md">成功率 / 时延 / 反馈按 variant 标签聚合，是"哪个版本更好"的唯一事实来源，也是 ⑤→① 发版决策的依据。</div></div>
+  </div>
+
+  <div class="section-t"><svg viewBox="0 0 24 24"><path d="M16 3.13a4 4 0 0 1 0 7.75M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M9 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM1 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/></svg>用户角色</div>
+  <div class="roles" id="roles"></div>
+
+  <div class="section-t"><svg viewBox="0 0 24 24"><path d="m22 12-4 0m-2 0-2 0m-2 0-2 0m-2 0-2 0m-2 0-2 0"/><path d="M12 2v4m0 12v4"/><circle cx="12" cy="12" r="3"/></svg>闭环健康指标（成败判据）</div>
+  <div class="health" id="health"></div>
+</div>
+
+<div class="mask" id="mask" onclick="closeD()"></div>
+<div class="drawer" id="drawer">
+  <div class="dhead"><h3 id="dtitle">详情</h3><svg class="x" viewBox="0 0 24 24" onclick="closeD()"><path d="M18 6 6 18M6 6l12 12"/></svg></div>
+  <div class="dbody" id="dbody"></div>
+</div>
+<script>
+const IC={
+  play:'<path d="M5 3l14 9-14 9V3z"/>',
+  cpu:'<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/>',
+  save:'<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/>',
+  sparkles:'<path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><path d="m6 6 2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/>',
+  check:'<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+  share:'<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>',
+  user:'<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  users:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+  shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.17V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15H4.5a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 6.2 9.4l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 12 4.6h0A1.65 1.65 0 0 0 13.4 3l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V8a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  bot:'<rect x="3" y="8" width="18" height="12" rx="2"/><path d="M12 8V4M8 2h8"/><circle cx="9" cy="14" r="1"/><circle cx="15" cy="14" r="1"/>'
+};
+function svg(n,st){return `<svg viewBox="0 0 24 24" style="stroke:${st||'currentColor'}">${IC[n]}</svg>`;}
+
+const NODES=[
+  {idx:'①',key:'start',cls:'client',ic:'play',color:'var(--green)',title:'会话启动',desc:'client_id→GrowthBook→版本串→KitOps ref→pull 加载',roles:['①终端'],fr:['FR2','FR3'],
+   detail:{职责:'按 client_id 稳定分桶绑定 variant，解析为 KitOps ref 并拉取加载。弱网命中缓存跳过拉取，无缓存回退 baseline。',能做:['当前绑定 variant 透明展示','强制拉最新 / 锁定版本','离线缓存与回退策略可视化'],reqs:[['PRD-01','会话启动灰度绑定','p0']]}},
+  {idx:'②',key:'exec',cls:'client',ic:'cpu',color:'var(--green)',title:'本地执行',desc:'OpenHands/Aider + LiteLLM 本地推理，数据不出机',roles:['①终端'],fr:['FR7','NFR1'],
+   detail:{职责:'本地推理执行任务，trace 打 variant 标签回灌 Langfuse（只传遥测不传原始对话）。这是度量的数据源头。',能做:['trace 带 variant 标签（必做）','用户 👍/👎 反馈入口——自进化燃料','本地成功/失败信号采集'],reqs:[['PRD-02','trace 带 variant 回灌','p0'],['PRD-07','用户反馈入口','p1']]}},
+  {idx:'③',key:'settle',cls:'client',ic:'save',color:'var(--green)',title:'技能沉淀',desc:'Letta 记忆 + 本地 skill 文件，默认不上传',roles:['①终端','⑤Hermes'],fr:['FR4'],
+   detail:{职责:'会话结束提取可复用 skill 存本地，默认不上传（NFR1）。Hermes 读取沉淀作为自进化输入。',能做:['本地已沉淀 skill 清单','手动标记"值得沉淀"','沉淀质量本地自评'],reqs:[['PRD-11','技能沉淀可视化','p1']]}},
+  {idx:'④',key:'evolve',cls:'auto',ic:'sparkles',color:'var(--yellow)',title:'自进化',desc:'Hermes 读轨迹+反馈 → 生成 skill 改进候选',roles:['⑤Hermes'],fr:['FR5'],
+   detail:{职责:'半自动：只产候选不自动生效，规避劣化不可追溯。候选自带预期改进点与来源轨迹。',能做:['触发策略（定时/攒够反馈/失败率超阈值）','候选带预期改进点+来源轨迹','候选通过率监控（防审核负担）'],reqs:[['PRD-08','候选通过率/积压监控','p1'],['PRD-12','候选自带元信息','p1']]}},
+  {idx:'⑤',key:'review',cls:'platform',ic:'check',color:'var(--primary)',title:'审核发版',desc:'后台审批 → kit pack+push 新版 → 建实验进灰度池',roles:['②运营','③审核'],fr:['FR5','FR7'],
+   detail:{职责:'闭环里唯一需要人决策的环节。通过→打包发新版→建实验接回①；驳回带原因反哺 Hermes。',能做:['并排 diff 审核（已有）','批量审核 + 审核历史/审计','通过后自动发版建实验可视化','驳回原因沉淀反哺 Hermes'],reqs:[['PRD-05','候选审核发版','p0'],['PRD-17','审核历史/审计线','p2']]}},
+  {idx:'⑥',key:'share',cls:'client',ic:'share',color:'var(--green)',title:'回流共享',desc:'显式授权上传去标识化 skill 到 ClawHub',roles:['①终端','②运营'],fr:['FR6'],
+   detail:{职责:'默认关闭。显式授权后剥离原始对话，只留 skill 文本上传团队共享区。',能做:['回流授权流','去标识化预览（确认不含机密）','团队资产市场浏览'],reqs:[['PRD-13','回流共享+去标识化预览','p2']]}}
+];
+const ROLES=[
+  {ic:'user',name:'① 终端使用者',desc:'开发者/运营/排障，每天用 Agent 干活',tp:'OpenClaw 客户端'},
+  {ic:'users',name:'② 资产运营者',desc:'管版本、开实验、看指标、审批发版',tp:'React 运营后台'},
+  {ic:'check',name:'③ 技能审核者',desc:'判断候选质量、可追溯、批量处理',tp:'候选审核页'},
+  {ic:'shield',name:'④ 部署运维者',desc:'私有化部署、访问控制、服务健康',tp:'部署脚本+设置'},
+  {ic:'bot',name:'⑤ Hermes（非人）',desc:'读轨迹→产候选→提交待审',tp:'后台 API'}
+];
+const HEALTH=[
+  {l:'候选通过率',n:'—',t:'目标 >40%',cls:'',note:'过低=自进化在制造审核负担（CEO 盲点①）'},
+  {l:'版本迭代收益',n:'—',t:'新 vs 旧 baseline',cls:'',note:'衡量飞轮是否正向'},
+  {l:'实验样本进度',n:'—',t:'达统计显著',cls:'',note:'小团队低流量周期长（CEO 盲点②）'}
+];
+// render
+document.getElementById('loop').innerHTML=NODES.map((n,i)=>
+  `<div class="node ${n.cls}" onclick="openNode(${i})">
+    <span class="idx">${n.idx}</span>
+    <div class="nt">${svg(n.ic,n.color)}${n.title}</div>
+    <div class="nd">${n.desc}</div>
+    <div class="tags">${n.roles.map(r=>`<span class="tag role">${r}</span>`).join('')}${n.fr.map(f=>`<span class="tag fr">${f}</span>`).join('')}</div>
+  </div>`).join('');
+document.getElementById('roles').innerHTML=ROLES.map(r=>
+  `<div class="role-card"><div class="rn">${svg(r.ic,'var(--t1)')}${r.name}</div><div class="rd">${r.desc}</div><div class="rt">${r.tp}</div></div>`).join('');
+document.getElementById('health').innerHTML=HEALTH.map(h=>
+  `<div class="hc"><div class="hl">${h.l}</div><div class="hn">${h.n}</div><div class="hnote">${h.note}</div><div class="ht">${h.t}</div></div>`).join('');
+// drawer
+function openNode(i){
+  const n=NODES[i],d=n.detail;
+  const html=`
+    <div class="kv"><span class="k">环节</span><span>${n.idx} ${n.title}</span></div>
+    <div class="kv"><span class="k">关联角色</span><span>${n.roles.join('、')}</span></div>
+    <div class="kv"><span class="k">FR</span><span class="mono">${n.fr.join(' / ')}</span></div>
+    <h4>职责</h4><p>${d.职责}</p>
+    <h4>这一环可做的事</h4>
+    <ul class="reqs">${d.能做.map(x=>`<li><span class="id">·</span><span>${x}</span></li>`).join('')}</ul>
+    <h4>关联需求</h4>
+    <ul class="reqs">${d.reqs.map(r=>`<li><span class="id">${r[0]}</span><span>${r[1]}</span><span class="badge ${r[2]}" style="margin-left:auto">${r[2].toUpperCase()}</span></li>`).join('')}</ul>`;
+  document.getElementById('dtitle').textContent=n.idx+' '+n.title;
+  document.getElementById('dbody').innerHTML=html;
+  document.getElementById('drawer').classList.add('show');
+  document.getElementById('mask').classList.add('show');
+}
+function closeD(){document.getElementById('drawer').classList.remove('show');document.getElementById('mask').classList.remove('show');}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeD();});
+</script>
+</body>
+</html>

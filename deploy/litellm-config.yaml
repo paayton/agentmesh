@@ -1,0 +1,25 @@
+# LiteLLM Proxy 配置 —— 云端多厂商统一路由
+# 客户端用 model_name 指定逻辑模型，proxy 按下方映射转发到对应厂商。
+# 厂商密钥从环境变量注入（见 docker-compose.yml / .env），不写死在此文件。
+model_list:
+  - model_name: claude-sonnet
+    litellm_params:
+      model: anthropic/claude-sonnet-4-20250514
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: kimi
+    litellm_params:
+      model: moonshot/moonshot-v1-128k
+      api_key: os.environ/MOONSHOT_API_KEY
+
+litellm_settings:
+  # 遥测：把每次调用上报到团队 Langfuse
+  success_callback: ["langfuse"]
+  failure_callback: ["langfuse"]
+  drop_params: true
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
